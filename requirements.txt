@@ -1,0 +1,11 @@
+requests
+pandas
+numpy
+pyyaml
+python-dateutil
+pulp
+scikit-learn
+joblib
+tqdm
+nflreadpy[pandas]
+pyarrow
