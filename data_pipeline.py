@@ -1,43 +1,62 @@
-# Clean, pandas-only loader using nflreadpy[pandas].
-# There is intentionally NO manual HTTP fallback here to avoid 404 churn.
-# Make sure you've run:  pip install "nflreadpy[pandas]"
-
 # data_pipeline.py
-import pandas as pd
-from pathlib import Path
 
-def load_pbp(years, out_dir: str = "data/pbp") -> pd.DataFrame:
-    import nflreadpy as nr
-    frames = []
+# Loader: Pandas-only PBP loader via nflreadpy[pandas]. Saves a parquet snapshot per year range.
+# Install: pip install "nflreadpy[pandas]"  (and for parquet: pip install pyarrow)
+
+from __future__ import annotations
+from pathlib import Path
+from typing import Iterable, Tuple, Dict, Any
+
+import pandas as pd
+
+
+# Loader: Read play-by-play for given seasons and persist a parquet cache.
+def load_pbp(years: Iterable[int], out_dir: str = "data/pbp") -> pd.DataFrame:
+    import nflreadpy as nr  # local import to keep global deps light
+
+    frames: list[pd.DataFrame] = []
     for y in years:
-        _df = nr.load_pbp(seasons=[y])  # could be pandas OR polars depending on install
+        df = nr.load_pbp(seasons=[int(y)])  # nflreadpy returns pandas (or polars if installed)
+        # Utils: Convert polars → pandas if needed, without requiring polars at install time.
         try:
-            import polars as pl  # may or may not be installed
-            if isinstance(_df, pl.DataFrame):
-                _df = _df.to_pandas()
+            import polars as pl  # optional
+            if isinstance(df, pl.DataFrame):
+                df = df.to_pandas()
         except Exception:
-            # polars not installed or not a polars df — assume pandas already
             pass
-        if not isinstance(_df, pd.DataFrame):
-            # last-resort guardrail
-            _df = pd.DataFrame(_df)
-        frames.append(_df)
+
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(df)  # Guardrail: coerce to pandas
+
+        frames.append(df)
+
+    if not frames:
+        return pd.DataFrame()
+
     out = pd.concat(frames, ignore_index=True)
 
-    Path(out_dir).mkdir(parents=True, exist_ok=True)
-    # ensure parquet-safe column names
+    # Utils: Ensure safe column names for parquet (must be strings).
     out.columns = out.columns.map(str)
-    out.to_parquet(Path(out_dir) / f"pbp_{min(years)}_{max(years)}.parquet", index=False)
+
+    # IO: Write snapshot to parquet (requires pyarrow or fastparquet installed).
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    out_path = Path(out_dir) / f"pbp_{min(years)}_{max(years)}.parquet"
+    out.to_parquet(out_path, index=False)
 
     return out
 
 
-# Weather fetcher using OpenWeatherMap (user supplies key)
-# def get_weather_for_game(game_datetime_utc: str, stadium_coords: tuple, owm_key: str):
-    # stadium_coords = (lat, lon)
+# Weather: Historical point lookup from OpenWeather (optional helper).
+# Usage: get_weather_for_game("2024-10-06T17:00:00Z", (40.4468, -80.0158), os.environ["OWM_KEY"])
+def get_weather_for_game(game_datetime_utc: str, stadium_coords: Tuple[float, float], owm_key: str) -> Dict[str, Any]:
+    import requests  # local import so 'requests' isn’t a hard dependency if unused
+
     lat, lon = stadium_coords
-    ts = int(pd.to_datetime(game_datetime_utc).timestamp())
-    url = f"https://api.openweathermap.org/data/2.5/onecall/timemachine?lat={lat}&lon={lon}&dt={ts}&appid={owm_key}"
-    r = requests.get(url)
+    ts = int(pd.to_datetime(game_datetime_utc, utc=True).timestamp())
+    url = (
+        "https://api.openweathermap.org/data/2.5/onecall/timemachine"
+        f"?lat={lat}&lon={lon}&dt={ts}&appid={owm_key}"
+    )
+    r = requests.get(url, timeout=30)
     r.raise_for_status()
     return r.json()

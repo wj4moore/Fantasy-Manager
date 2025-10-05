@@ -4,7 +4,7 @@ import os
 # Env: Load .env into environment variables.
 load_dotenv()
 
-# Env Vars: Optional keys you may use later.
+# Env Vars: Keys may be used later.
 db_url = os.getenv("DATABASE_URL")
 sleeper_key = os.getenv("SLEEPER_API_KEY")
 espn_key = os.getenv("ESPN_API_KEY")
