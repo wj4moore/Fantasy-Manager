@@ -48,7 +48,7 @@ Fantasy-Manager/
 This file contains basic settings used by `manager.py`:
 
 ```yaml
-league_id: "123456789012345678"
+league_id: "YourLeagueID"
 season: 2025
 week: auto
 user: "YourSleeperUsername"
@@ -70,7 +70,7 @@ OWM_API_KEY=your_openweathermap_key_here
 
 ```bash
 # Clone the repo
-git clone https://github.com/wj4moore/Fantasy-Manager.git
+git clone https://github.com/yourgitrepo.git
 cd Fantasy-Manager
 
 # (Recommended) Create virtual environment
