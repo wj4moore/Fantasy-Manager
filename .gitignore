@@ -1,33 +1,74 @@
-# --- Python cache ---
+# ===================================
+# Fantasy Manager Project .gitignore
+# ===================================
+
+# 🧠 Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
 
-# --- Virtual envs ---
-venv/
-.env/
+# 🧰 Virtual Environments
 .venv/
 .venv311/
+venv/
 env/
+ENV/
+*.env
+.env.*
+.envrc
 
-# --- Local data/artifacts ---
+# 💾 Data & Models
 data/
 models/
 *.parquet
 *.csv
-*.gz
-*.zip
+*.xlsx
+*.joblib
 
-# --- IDE/project noise ---
+# ⚙️ Config & Secrets
+config.yml
+*.key
+*.pem
+*.p12
+*.secret
+*.token
+*.credentials
+secrets.json
+
+# 🧪 Logs & Cache
+logs/
+*.log
+*.tmp
+.cache/
+*.bak
+
+# 🧑‍💻 IDEs & Editors
 .vscode/
 .idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
 
-# --- Secrets/config (local only) ---
-*.env
-.env*
-config.yml
-
-# --- OS junk ---
+# 🧱 OS-specific
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# 🚀 Jupyter / Notebooks
+.ipynb_checkpoints/
+
+# 🧾 Reports / Outputs
+*.pdf
+*.html
+*.md.backup
+
+# 🧲 Test & Debug Outputs
+test_outputs/
+debug/
