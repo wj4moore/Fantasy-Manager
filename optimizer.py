@@ -6,8 +6,7 @@ import pandas as pd
 
 # Sets: which positions can occupy FLEX/SUPER_FLEX.
 FLEX_SET = {"RB", "WR", "TE"}
-SUPER_FLEX_SET = {"QB", "RB", "WR", "TE"}
-
+SUPER_FLEX_SET = {"RB", "WR", "TE"}
 
 # Main: optimize lineup under roster constraints (robust to shortages).
 def optimize_lineup(players_df: pd.DataFrame, roster_constraints: dict) -> pd.DataFrame:
@@ -42,6 +41,12 @@ def optimize_lineup(players_df: pd.DataFrame, roster_constraints: dict) -> pd.Da
         cnt = int(cnt)
         prob += pulp.lpSum(x[i] for i in df.index if df.loc[i, "position"] == pos) <= cnt
 
+    # >>> Minimal fix to keep QB out of FLEX by forcing EXACT QB count <<<
+    if "QB" in roster_constraints:
+        qb_cnt = int(roster_constraints.get("QB", 0))
+        # With the ≤ constraint above + this ≥, QB selection becomes exactly qb_cnt.
+        prob += pulp.lpSum(x[i] for i in df.index if df.loc[i, "position"] == "QB") >= qb_cnt
+
     # FLEX Min: ensure enough total RB/WR/TE to cover fixed + FLEX.
     flex_required = int(roster_constraints.get("FLEX", 0))
     if flex_required > 0:
@@ -49,7 +54,7 @@ def optimize_lineup(players_df: pd.DataFrame, roster_constraints: dict) -> pd.Da
         need_from_flex_pool = fixed_in_flex_pool + flex_required
         prob += pulp.lpSum(x[i] for i in df.index if df.loc[i, "position"] in FLEX_SET) >= need_from_flex_pool
 
-    # SUPER_FLEX Min: ensure enough total among QB+RB+WR+TE to cover fixed + SUPER_FLEX.
+    # SUPER_FLEX Min: ensure enough total among RB/WR/TE (QB is intentionally excluded).
     sflex_required = int(roster_constraints.get("SUPER_FLEX", 0))
     if sflex_required > 0:
         fixed_in_sflex_pool = sum(int(roster_constraints.get(p, 0)) for p in SUPER_FLEX_SET)

@@ -70,7 +70,7 @@ OWM_API_KEY=your_openweathermap_key_here
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourgitrepo.git
+git clone https://github.com/wj4moore/Fantasy-Manager.git
 cd Fantasy-Manager
 
 # (Recommended) Create virtual environment

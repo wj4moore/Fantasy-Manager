@@ -279,17 +279,16 @@ def assign_slots(selected_df: pd.DataFrame, constraints: dict) -> pd.DataFrame:
     for pos in ["QB", "RB", "WR", "TE", "K", "DEF"]:
         take_exact(pos, int(constraints.get(pos, 0)))
 
+        # FLEX from RB/WR/TE only (no QB/DEF/K backfill)
     flex_need = int(constraints.get("FLEX", 0))
     if flex_need > 0:
+        # pick FLEX-eligible first
         mask_flex = (df["slot"] == "") & (df["position"].isin(FLEX_SET))
         flex_idx = df[mask_flex].head(flex_need).index.tolist()
         for i, idx in enumerate(flex_idx, start=1):
             df.at[idx, "slot"] = f"FLEX{i}"
-        short = flex_need - len(flex_idx)
-        if short > 0:
-            backfill_idx = df[df["slot"] == ""].head(short).index.tolist()
-            for k, idx in enumerate(backfill_idx, start=len(flex_idx) + 1):
-                df.at[idx, "slot"] = f"FLEX{k}"
+
+        # DO NOT backfill FLEX with non-eligible positions
 
     leftover_idx = df.index[df["slot"] == ""].tolist()
     for j, idx in enumerate(leftover_idx, start=1):
@@ -541,6 +540,50 @@ def run_week(league_id: str, week: int, user: str | None = None, owner_id: str |
             on="player_id",
             how="left",
         )
+    # --- Guard: keep FLEX as RB/WR/TE without breaking fixed-position minimums ---
+    flex_want = int(constraints.get("FLEX", 0))
+    if flex_want > 0:
+        base_fixed = sum(int(constraints.get(p, 0)) for p in FLEX_SET)
+        chosen_flex_eligible = int(optimized["position"].isin(FLEX_SET).sum())
+        target_flex_pool = base_fixed + flex_want
+
+        if chosen_flex_eligible < target_flex_pool:
+            bench_pool = opt_input[~opt_input["player_id"].isin(optimized["player_id"])]
+            bench_flex = bench_pool[bench_pool["position"].isin(FLEX_SET)].sort_values("projected", ascending=False)
+
+            need = target_flex_pool - chosen_flex_eligible
+            add = bench_flex.head(need).copy()
+
+            if not add.empty:
+                # Current counts per position in the chosen lineup
+                cur_counts = optimized["position"].value_counts().to_dict()
+
+                # Candidates to remove = non-FLEX positions where removing one won't drop below required minimum
+                def removable_mask(row):
+                    pos = row["position"]
+                    min_needed = int(constraints.get(pos, 0))  # 0 if not in constraints
+                    have_now = int(cur_counts.get(pos, 0))
+                    return (pos not in FLEX_SET) and (have_now > min_needed)
+
+                removable = (
+                    optimized[optimized.apply(removable_mask, axis=1)]
+                    .sort_values("projected", ascending=True)
+                    .head(len(add))
+                )
+
+                # If we still don’t have enough safe removals, don’t force it.
+                if len(removable) == len(add):
+                    # Apply swap and update counts
+                    cur_counts = optimized["position"].value_counts().to_dict()
+                    keep = optimized[~optimized["player_id"].isin(removable["player_id"])]
+                    optimized = (
+                        pd.concat([keep, add], ignore_index=True)
+                        .sort_values("projected", ascending=False)
+                    )
+                # else: not enough safe removals; leave optimized as-is
+
+    # Now safe to assign slots
+    with_slots = assign_slots(optimized, constraints)
 
     # Output: Assign slots and print starters.
     with_slots = assign_slots(optimized, constraints)
